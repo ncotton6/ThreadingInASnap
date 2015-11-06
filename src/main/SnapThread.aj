@@ -1,7 +1,8 @@
 package main;
 
-import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.reflect.MethodSignature;
+
 import java.util.concurrent.Semaphore;
 
 import main.annotations.*;
@@ -13,7 +14,8 @@ public aspect SnapThread {
 
 	Object around(): async(){
 		ThreadingConstraints tc = ThreadingConstraints.get();
-		final String key = thisJoinPointStaticPart.getSignature().toLongString();
+		final String key = thisJoinPointStaticPart.getSignature()
+				.toLongString();
 		Semaphore sp = null;
 		if ((sp = tc.lockMap.get(key)) == null) {
 			synchronized (tc) {
@@ -21,8 +23,6 @@ public aspect SnapThread {
 					MethodSignature ms = (MethodSignature) thisJoinPointStaticPart
 							.getSignature();
 					Async a = ms.getMethod().getAnnotation(Async.class);
-					System.out.println("CREATING SEMAPHORE [" + key + "] ["
-							+ a.threads() + "]");
 					// create a semaphore for this method
 					Semaphore s = new Semaphore(
 							a.threads() <= 0 ? Integer.MAX_VALUE : a.threads(),
@@ -50,6 +50,29 @@ public aspect SnapThread {
 	}
 
 	// sync methods
+	pointcut sync() : execution(@Sync * *..*(..));
+
+	Object around() : sync(){
+		String key = thisJoinPointStaticPart.getSignature().toLongString();
+		ThreadingConstraints tc = ThreadingConstraints.get();
+		Semaphore sp = null;
+		if ((sp = tc.lockMap.get(key)) == null) {
+			synchronized (tc) {
+				if ((sp = tc.lockMap.get(key)) == null) {
+					sp = new Semaphore(1);
+					tc.lockMap.put(key, sp);
+				}
+			}
+		}
+		try {
+			sp.acquire();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		Object ret = proceed();
+		sp.release();
+		return ret;
+	}
 
 	// sync fields
 
@@ -60,8 +83,7 @@ public aspect SnapThread {
 		while (!ThreadTree.get().threadReady(Thread.currentThread())) {
 			Thread.yield();
 		}
-		proceed();
-		return new Object();
+		return proceed();
 	}
 
 }
