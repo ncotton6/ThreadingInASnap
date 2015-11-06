@@ -24,7 +24,7 @@ public class DBSim {
 
 	}
 
-	@Async
+	@Async(threads = 99)
 	private static void getResult(String string) {
 		try {
 			Thread.sleep(rand.nextInt(5000));

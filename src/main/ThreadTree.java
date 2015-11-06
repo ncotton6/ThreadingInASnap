@@ -24,7 +24,7 @@ public class ThreadTree {
 	}
 
 	public void addThread(Thread parent, Thread spawn) {
-		System.out.println(parent.getName() + " :: >> " + spawn.getName());
+		//System.out.println(parent.getName() + " :: >> " + spawn.getName());
 		ThreadNode tn = find(parent, base);
 		ThreadNode newNode = new ThreadNode(spawn);
 		newNode.parent = tn;
@@ -32,12 +32,10 @@ public class ThreadTree {
 	}
 
 	private ThreadNode find(Thread thread, ThreadNode node) {
-		System.out.println(thread.getName() + ":::" + node.thread.getName());
 		if (node.thread.equals(thread))
 			return node;
 		for (ThreadNode tn : node.spawn) {
-			System.out.println("\t" + tn.thread.getName());
-			ThreadNode ret = find(thread, node);
+			ThreadNode ret = find(thread, tn);
 			if (ret != null)
 				return ret;
 		}
