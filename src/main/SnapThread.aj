@@ -28,7 +28,7 @@ public aspect SnapThread {
 		ThreadingConstraints tc = ThreadingConstraints.get();
 		MethodSignature ms = (MethodSignature) thisJoinPointStaticPart
 				.getSignature();
-		Class<?> returnType = ms.getReturnType();
+		final Class<?> returnType = ms.getReturnType();
 		final String key = ms.toLongString();
 		if (tc.lockMap.get(key) == null) {
 			synchronized (tc) {
@@ -42,11 +42,30 @@ public aspect SnapThread {
 				}
 			}
 		}
+
 		if (tc.getThreadCount() >= Runtime.getRuntime().availableProcessors() * 3
-				|| (!returnType.equals(Void.TYPE) && (!ShellObj.class
-						.isAssignableFrom(returnType)))) {
+				|| ((!returnType.equals(Void.TYPE) && (!ShellObj.class
+						.isAssignableFrom(returnType))))) {
 			// create a constraint on the number of actively running threads.
 			return proceed();
+		} else if (returnType.equals(Void.TYPE)) {
+			ThreadingConstraints.get().incThreadCount();
+			Thread t = new Thread(new Runnable() {
+				@Override
+				public void run() {
+					Semaphore sp = ThreadingConstraints.get().lockMap.get(key);
+					try {
+						sp.acquire();
+						proceed();
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					} finally {
+						sp.release();
+						ThreadingConstraints.get().decThreadCount();
+					}
+				}
+			});
+			t.start();
 		} else {
 			// create shell object
 			final UUID uuid = UUID.randomUUID();
@@ -73,6 +92,9 @@ public aspect SnapThread {
 						try {
 							sp.acquire();
 							Object ret = proceed();
+							if (ret == null)
+								System.err.println("Returned Object Null: "
+										+ uuid);
 							ObjectPool.get().addObject(uuid, ret);
 						} catch (InterruptedException e) {
 							e.printStackTrace();
@@ -89,6 +111,7 @@ public aspect SnapThread {
 			t.start();
 			return ret;
 		}
+		return null;
 	}
 
 	// sync methods
@@ -148,6 +171,9 @@ public aspect SnapThread {
 			try {
 				f.set(shell, f.get(actual));
 			} catch (IllegalAccessException e) {
+				// e.printStackTrace();
+			} catch (Exception e) {
+				System.err.println("EHHHHHHHH!!!!");
 				e.printStackTrace();
 			}
 		}
