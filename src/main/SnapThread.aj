@@ -1,52 +1,94 @@
 package main;
 
-import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.reflect.MethodSignature;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.concurrent.Semaphore;
+import java.util.UUID;
+import java.lang.reflect.*;
 
 import main.annotations.*;
+import main.constructs.*;
 
 public aspect SnapThread {
+
+	// inject shell objects
+	declare parents : (@Shell *) implements ShellObj;
+	declare parents : (@Shell *..*) implements ShellObj;
+
+	public UUID ShellObj.__shellObjectId = null;
 
 	// async methods
 	pointcut async() : execution(@Async * *..*(..));
 
 	Object around(): async(){
+		// Generate semaphore
+		// only creates the semaphore on the first
+		// encounter
 		ThreadingConstraints tc = ThreadingConstraints.get();
-		final String key = thisJoinPointStaticPart.getSignature()
-				.toLongString();
-		Semaphore sp = null;
-		if ((sp = tc.lockMap.get(key)) == null) {
+		MethodSignature ms = (MethodSignature) thisJoinPointStaticPart
+				.getSignature();
+		Class<?> returnType = ms.getReturnType();
+		final String key = ms.toLongString();
+		if (tc.lockMap.get(key) == null) {
 			synchronized (tc) {
-				if ((sp = tc.lockMap.get(key)) == null) {
-					MethodSignature ms = (MethodSignature) thisJoinPointStaticPart
-							.getSignature();
+				if (tc.lockMap.get(key) == null) {
 					Async a = ms.getMethod().getAnnotation(Async.class);
 					// create a semaphore for this method
-					Semaphore s = new Semaphore(
+					ContextSemaphore s = new ContextSemaphore(
 							a.threads() <= 0 ? Integer.MAX_VALUE : a.threads(),
 							true);
 					tc.lockMap.put(key, s);
 				}
 			}
 		}
-		Thread t = new Thread(new Runnable() {
-			public void run() {
+		if (tc.getThreadCount() >= Runtime.getRuntime().availableProcessors() * 3
+				|| (!returnType.equals(Void.TYPE) && (!ShellObj.class
+						.isAssignableFrom(returnType)))) {
+			// create a constraint on the number of actively running threads.
+			return proceed();
+		} else {
+			// create shell object
+			final UUID uuid = UUID.randomUUID();
+			ShellObj ret = null;
+			if (!returnType.equals(Void.TYPE)) {
 				try {
-					Semaphore sp = ThreadingConstraints.get().lockMap.get(key);
-					sp.acquire();
-					proceed();
-					sp.release();
-				} catch (InterruptedException e) {
-					System.out.println("Interuppeted exception");
+					ret = (ShellObj) returnType.getConstructor().newInstance();
+					ret.__shellObjectId = uuid;
+				} catch (NoSuchMethodException e) {
+					e.printStackTrace();
+				} catch (InvocationTargetException e) {
+					e.printStackTrace();
+				} catch (IllegalAccessException e) {
+					e.printStackTrace();
+				} catch (InstantiationException e) {
 					e.printStackTrace();
 				}
 			}
-		});
-		ThreadTree.get().addThread(Thread.currentThread(), t);
-		t.start();
-		return new Object();
+			ThreadingConstraints.get().incThreadCount();
+			Thread t = new Thread(new Runnable() {
+				public void run() {
+					Semaphore sp = ThreadingConstraints.get().lockMap.get(key);
+					try {
+						try {
+							sp.acquire();
+							Object ret = proceed();
+							ObjectPool.get().addObject(uuid, ret);
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+					} catch (Exception e) {
+						e.printStackTrace();
+					} finally {
+						ThreadingConstraints.get().decThreadCount();
+						sp.release();
+					}
+				}
+			});
+			ThreadTree.get().addThread(Thread.currentThread(), t);
+			t.start();
+			return ret;
+		}
 	}
 
 	// sync methods
@@ -55,11 +97,11 @@ public aspect SnapThread {
 	Object around() : sync(){
 		String key = thisJoinPointStaticPart.getSignature().toLongString();
 		ThreadingConstraints tc = ThreadingConstraints.get();
-		Semaphore sp = null;
+		ContextSemaphore sp = null;
 		if ((sp = tc.lockMap.get(key)) == null) {
 			synchronized (tc) {
 				if ((sp = tc.lockMap.get(key)) == null) {
-					sp = new Semaphore(1);
+					sp = new ContextSemaphore(1);
 					tc.lockMap.put(key, sp);
 				}
 			}
@@ -84,6 +126,31 @@ public aspect SnapThread {
 			Thread.yield();
 		}
 		return proceed();
+	}
+
+	// Using a Shell
+	pointcut shell(ShellObj shell) : call(* ShellObj+.*(..)) && target(shell);
+
+	before(ShellObj shell) : shell(shell) {
+		UUID id = shell.__shellObjectId;
+		if (id == null)
+			return;
+		ShellObj actual = ObjectPool.get().get(id);
+		makeEqual(shell, actual);
+		shell.__shellObjectId = null;
+	}
+
+	private static void makeEqual(ShellObj shell, ShellObj actual) {
+		Class<?> clazz = shell.getClass();
+		Field[] fields = clazz.getDeclaredFields();
+		for (Field f : fields) {
+			f.setAccessible(true);
+			try {
+				f.set(shell, f.get(actual));
+			} catch (IllegalAccessException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 
 }

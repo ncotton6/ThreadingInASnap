@@ -2,12 +2,14 @@ package main;
 
 import java.util.Map;
 import java.util.HashMap;
-import java.util.concurrent.Semaphore;
+
+import main.constructs.ContextSemaphore;
 
 public class ThreadingConstraints {
 
 	private static ThreadingConstraints tc = null;
-	public Map<String,Semaphore> lockMap = new HashMap<String,Semaphore>();
+	Map<String,ContextSemaphore> lockMap = new HashMap<String,ContextSemaphore>();
+	private Integer numberOfRunningThreads = 0;
 	
 	private ThreadingConstraints(){}
 	
@@ -19,6 +21,22 @@ public class ThreadingConstraints {
 				}
 			}
 		return tc;
+	}
+	
+	public void incThreadCount(){
+		synchronized (numberOfRunningThreads) {
+			numberOfRunningThreads += 1;
+		}
+	}
+	
+	public void decThreadCount(){
+		synchronized (numberOfRunningThreads) {
+			numberOfRunningThreads -= 1;
+		}
+	}
+	
+	public int getThreadCount(){
+		return numberOfRunningThreads;
 	}
 	
 }
