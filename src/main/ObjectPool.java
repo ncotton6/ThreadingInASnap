@@ -44,13 +44,15 @@ public class ObjectPool {
 
 	public ShellObj get(UUID uuid) {
 		String id = uuid.toString();
-		while (!errorPool.contains(id) && !objectPool.containsKey(id)) {
-			Thread.yield();
+		while (true) {
+			if(errorPool.contains(id))
+				throw new RuntimeException("She's Not Coming :(");
+			if(objectPool.containsKey(id))
+				break;
 		}
-		if (errorPool.contains(id))
-			throw new RuntimeException("She's Not Coming :(");
+			
 		ShellObj ret = objectPool.get(id);
-		objectPool.remove(id);
+		//objectPool.remove(id);
 		if(ret == null){
 			System.err.println(uuid);
 			System.err.println("Containing object is null");

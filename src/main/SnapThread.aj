@@ -152,7 +152,7 @@ public aspect SnapThread {
 	}
 
 	// Using a Shell
-	pointcut shell(ShellObj shell) : call(* ShellObj+.*(..)) && target(shell);
+	pointcut shell(ShellObj shell) : execution(* ShellObj+.*(..)) && target(shell);
 
 	before(ShellObj shell) : shell(shell) {
 		UUID id = shell.__shellObjectId;
