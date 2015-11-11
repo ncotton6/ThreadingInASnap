@@ -2,21 +2,38 @@ package main;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 /**
- * @author Nathaniel
+ * The ThreadTree has the job of maintaining order amongst all of the threads,
+ * to ensure order of execution is maintained.
+ * 
+ * @author Nathaniel Cotton
  * 
  */
 public class ThreadTree {
 
+	// Local Variables
 	private ThreadNode base;
 	private static ThreadTree tt = null;
 
+	/**
+	 * Private constructor to induce the singleton functionality.
+	 */
 	private ThreadTree() {
+		if (tt != null)
+			throw new RuntimeException(
+					"ThreadTree is a singleton, cannot create more than one");
 		this.base = new ThreadNode(Thread.currentThread());
 	}
 
+	/**
+	 * Gets the singleton instances of the ThreadTree to maintian order of the
+	 * threads.
+	 * 
+	 * @return
+	 */
 	public static ThreadTree get() {
 		if (tt == null) {
 			synchronized (ThreadTree.class) {
@@ -28,29 +45,79 @@ public class ThreadTree {
 		return tt;
 	}
 
+	/**
+	 * Adds a newly created thread to the tree
+	 * 
+	 * @param parent
+	 * @param spawn
+	 */
 	public void addThread(Thread parent, Thread spawn) {
-		ThreadNode tn = find(parent,base);
-		if(tn != null)
+		ThreadNode tn = find(parent, base);
+		if (tn != null)
 			new ThreadNode(spawn, tn);
 	}
 
+	/**
+	 * Uses DFS to search the tree of threads to find the node that represents
+	 * the current thread.
+	 * 
+	 * @param thread
+	 * @param node
+	 * @return
+	 */
 	private ThreadNode find(Thread thread, ThreadNode node) {
-		if(thread.equals(node.thread.get()))
+		if (thread.equals(node.thread.get()))
 			return node;
-		for(ThreadNode tn : node.spawn){
-			return find(thread,tn);
+		for (ThreadNode tn : node.spawn) {
+			return find(thread, tn);
 		}
 		return null;
 	}
 
+	/**
+	 * This method determines if the thread is ready to proceed. A thread is
+	 * given the right to proceed if and only if it doesn't have any child
+	 * threads running.
+	 * 
+	 * @param thread
+	 * @return
+	 */
 	public boolean threadReady(Thread thread) {
-		ThreadNode tn = find(thread,base);
-		if(tn == null)
-			
+		ThreadNode tn = find(thread, base);
+		if (tn != null){
+			Iterator<ThreadNode> iter = tn.spawn.iterator();
+			while(iter.hasNext()){
+				ThreadNode node = iter.next();
+				if(allDone(node)){
+					// prune dead branches of the tree
+					iter.remove();
+				}else{
+					return false;
+				}
+			}
+		}
+		return true;
 	}
 
-	private boolean allDone(ThreadNode child) {
-
+	/**
+	 * This method will use DFS to determine if all of the children and the
+	 * current thread have completed.
+	 * 
+	 * @param threadNode
+	 * @return
+	 */
+	private boolean allDone(ThreadNode threadNode) {
+		Thread t = threadNode.thread.get();
+		if (threadNode.spawn.size() == 0
+				&& (t == null || (t != null && !t.isAlive())))
+			return true;
+		if (t.isAlive())
+			return false;
+		for (ThreadNode tn : threadNode.spawn) {
+			if (!allDone(tn))
+				return false;
+		}
+		return true;
 	}
 
 	/**
@@ -60,23 +127,21 @@ public class ThreadTree {
 	 * 
 	 */
 	private class ThreadNode {
-		/* Local Variables */
+		//Local Variables
 		public long id;
 		public ThreadNode parent;
 		public WeakReference<Thread> thread;
 		public List<ThreadNode> spawn = new ArrayList<ThreadNode>();
 
-		
-		
 		/**
 		 * Simplest constructor for the ThreadNode
 		 * 
 		 * @param thread
 		 */
-		public ThreadNode(Thread thread){
+		public ThreadNode(Thread thread) {
 			this.thread = new WeakReference<Thread>(thread);
 		}
-		
+
 		/**
 		 * Constructor to contain the relationship between threads.
 		 * 
