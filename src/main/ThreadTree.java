@@ -84,15 +84,33 @@ public class ThreadTree {
 	 */
 	public boolean threadReady(Thread thread) {
 		ThreadNode tn = find(thread, base);
-		if (tn != null){
+		if (tn != null) {
+			// Check to make sure that all of the children of the node
+			// have completed
 			Iterator<ThreadNode> iter = tn.spawn.iterator();
-			while(iter.hasNext()){
+			while (iter.hasNext()) {
 				ThreadNode node = iter.next();
-				if(allDone(node)){
+				if (allDone(node)) {
 					// prune dead branches of the tree
 					iter.remove();
-				}else{
+				} else {
 					return false;
+				}
+			}
+			// Check to make sure all threads in the queue in front of
+			// the node have finished.
+			if (tn.parent != null) {
+				Iterator<ThreadNode> queue = tn.parent.spawn.iterator();
+				while (queue.hasNext()) {
+					ThreadNode node = queue.next();
+					if (node.equals(tn))
+						break;
+					else {
+						if (allDone(node))
+							queue.remove();
+						else
+							return false;
+					}
 				}
 			}
 		}
@@ -127,7 +145,7 @@ public class ThreadTree {
 	 * 
 	 */
 	private class ThreadNode {
-		//Local Variables
+		// Local Variables
 		public long id;
 		public ThreadNode parent;
 		public WeakReference<Thread> thread;
@@ -157,6 +175,32 @@ public class ThreadTree {
 			parent.spawn.add(this);
 		}
 
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			ThreadNode other = (ThreadNode) obj;
+			if (parent == null) {
+				if (other.parent != null)
+					return false;
+			} else if (!parent.equals(other.parent))
+				return false;
+			if (spawn == null) {
+				if (other.spawn != null)
+					return false;
+			} else if (!spawn.equals(other.spawn))
+				return false;
+			if (thread == null) {
+				if (other.thread != null)
+					return false;
+			} else if (!thread.equals(other.thread))
+				return false;
+			return true;
+		}
 	}
 
 }

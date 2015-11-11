@@ -65,6 +65,7 @@ public aspect SnapThread {
 					}
 				}
 			});
+			ThreadTree.get().addThread(Thread.currentThread(), t);
 			t.start();
 		} else {
 			// create shell object
