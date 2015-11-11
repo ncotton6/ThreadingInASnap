@@ -1,7 +1,5 @@
 package test.dbquery;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
 
 import main.annotations.Async;
@@ -10,12 +8,20 @@ import main.annotations.Order;
 public class DBSim {
 
 	static Random rand = new Random();
+	static long start;
 
 	public static void main(String[] args) {
+		start = System.currentTimeMillis();
 		for (int i = 0; i < 50; ++i) {
 			getResult(String.valueOf(i));
 		}
+		timeTaken();
+	}
 
+	@Order
+	private static void timeTaken() {
+		System.out.println("Time Taken: "
+				+ (System.currentTimeMillis() - start));
 	}
 
 	@Async

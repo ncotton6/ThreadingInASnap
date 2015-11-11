@@ -21,7 +21,7 @@ public class ShellObject {
 	@Order
 	private static void outputEnd(long start) {
 		System.out.println("Took: " + (System.currentTimeMillis() - start));
-		Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
+		/*Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
 		for (Thread t : threadSet) {
 			if (t.isAlive()) {
 				System.err.println(t.getName() + "::" + t.isAlive());
@@ -31,20 +31,20 @@ public class ShellObject {
 					t.dumpStack();
 				}
 			}
-		}
+		}*/
 	}
 
 	@Async
 	private static void output(TestObject to) {
 		to.toString();
-		// System.out.println("\t"+to.toString());
+		//System.out.println("\t"+to.toString());
 	}
 
 	@Async
 	private static TestObject generateObject() throws InterruptedException {
 		Thread.sleep(200);
 		TestObject to = new TestObject();
-		to.cash = lastCount + 2;
+		to.cash = lastCount += 2;
 		to.name = "Jar Jar Binks"; // idk doesn't matter
 		return to;
 	}

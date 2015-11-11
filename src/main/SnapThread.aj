@@ -93,16 +93,16 @@ public aspect SnapThread {
 						try {
 							sp.acquire();
 							Object ret = proceed();
-							if (ret == null) {
-								System.err.println("Returned Object Null: "
-										+ uuid);
+							if (ret != null) {
 								ObjectPool.get().addObject(uuid, ret);
+							} else {
+								ObjectPool.get().addError(uuid);
 							}
 						} catch (InterruptedException e) {
 							e.printStackTrace();
 						}
 					} catch (Exception e) {
-						e.printStackTrace();
+						ObjectPool.get().addError(uuid);
 					} finally {
 						ThreadingConstraints.get().decThreadCount();
 						sp.release();
@@ -177,6 +177,7 @@ public aspect SnapThread {
 			} catch (Exception e) {
 				System.err.println("EHHHHHHHH!!!!");
 				e.printStackTrace();
+				System.exit(1);
 			}
 		}
 	}
