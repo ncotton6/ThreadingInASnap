@@ -92,10 +92,11 @@ public aspect SnapThread {
 						try {
 							sp.acquire();
 							Object ret = proceed();
-							if (ret == null)
+							if (ret == null) {
 								System.err.println("Returned Object Null: "
 										+ uuid);
-							ObjectPool.get().addObject(uuid, ret);
+								ObjectPool.get().addObject(uuid, ret);
+							}
 						} catch (InterruptedException e) {
 							e.printStackTrace();
 						}

@@ -1,8 +1,13 @@
 package main;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * @author Nathaniel
+ * 
+ */
 public class ThreadTree {
 
 	private ThreadNode base;
@@ -24,70 +29,67 @@ public class ThreadTree {
 	}
 
 	public void addThread(Thread parent, Thread spawn) {
-		//System.out.println(parent.getName() + " :: >> " + spawn.getName());
-		ThreadNode tn = find(parent, base);
-		ThreadNode newNode = new ThreadNode(spawn);
-		newNode.parent = tn;
-		tn.add(newNode);
+		ThreadNode tn = find(parent,base);
+		if(tn != null)
+			new ThreadNode(spawn, tn);
 	}
 
 	private ThreadNode find(Thread thread, ThreadNode node) {
-		if (node.thread.equals(thread))
+		if(thread.equals(node.thread.get()))
 			return node;
-		for (ThreadNode tn : node.spawn) {
-			ThreadNode ret = find(thread, tn);
-			if (ret != null)
-				return ret;
+		for(ThreadNode tn : node.spawn){
+			return find(thread,tn);
 		}
 		return null;
 	}
 
 	public boolean threadReady(Thread thread) {
-		ThreadNode tn = find(thread, base);
-		boolean done = true;
-		for (ThreadNode child : tn.spawn) {
-			done = allDone(child);
-			if (!done)
-				break;
-		}
-		
-		// the following code will execute for everything except for the main
-		if (tn.parent != null) {
-			List<ThreadNode> currentLevel = tn.parent.spawn;
-			for (ThreadNode prevNode : currentLevel) {
-				// you don't have to check the current thread or anything past
-				// it
-				if (prevNode.thread.equals(thread))
-					break;
-				done = allDone(prevNode);
-				if (!done)
-					break;
-			}
-		}
-		return done;
+		ThreadNode tn = find(thread,base);
+		if(tn == null)
+			
 	}
 
 	private boolean allDone(ThreadNode child) {
-		if (child.thread.isAlive())
-			return false;
-		for (ThreadNode tn : child.spawn) {
-			if (!allDone(tn))
-				return false;
-		}
-		return true;
+
 	}
 
+	/**
+	 * Inner class used to keep track of the relationship between threads.
+	 * 
+	 * @author Nathaniel Cotton
+	 * 
+	 */
 	private class ThreadNode {
+		/* Local Variables */
+		public long id;
 		public ThreadNode parent;
-		public Thread thread;
+		public WeakReference<Thread> thread;
 		public List<ThreadNode> spawn = new ArrayList<ThreadNode>();
 
-		public ThreadNode(Thread parent) {
-			this.thread = parent;
+		
+		
+		/**
+		 * Simplest constructor for the ThreadNode
+		 * 
+		 * @param thread
+		 */
+		public ThreadNode(Thread thread){
+			this.thread = new WeakReference<Thread>(thread);
 		}
-
-		public void add(ThreadNode spawn) {
-			this.spawn.add(spawn);
+		
+		/**
+		 * Constructor to contain the relationship between threads.
+		 * 
+		 * @param Thread
+		 *            the current thread
+		 * @param ThreadNode
+		 *            the thread that created the thread
+		 */
+		public ThreadNode(Thread thread, ThreadNode parent) {
+			this.thread = new WeakReference<Thread>(thread);
+			this.parent = parent;
+			this.id = thread.getId();
+			parent.spawn.add(this);
 		}
 
 	}
