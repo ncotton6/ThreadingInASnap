@@ -51,7 +51,7 @@ public class ThreadTree {
 	 * @param parent
 	 * @param spawn
 	 */
-	public void addThread(Thread parent, Thread spawn) {
+	public synchronized void addThread(Thread parent, Thread spawn) {
 		ThreadNode tn = find(parent, base);
 		if (tn != null)
 			new ThreadNode(spawn, tn);
@@ -69,7 +69,9 @@ public class ThreadTree {
 		if (thread.equals(node.thread.get()))
 			return node;
 		for (ThreadNode tn : node.spawn) {
-			return find(thread, tn);
+			ThreadNode temp = null;
+			if ((temp = find(thread, tn)) != null)
+				return temp;
 		}
 		return null;
 	}
@@ -82,7 +84,7 @@ public class ThreadTree {
 	 * @param thread
 	 * @return
 	 */
-	public boolean threadReady(Thread thread) {
+	public synchronized boolean threadReady(Thread thread) {
 		ThreadNode tn = find(thread, base);
 		if (tn != null) {
 			// Check to make sure that all of the children of the node
@@ -106,9 +108,10 @@ public class ThreadTree {
 					if (node.equals(tn))
 						break;
 					else {
-						if (allDone(node))
+						if (allDone(node)) {
+							// prune dead branches of the tree
 							queue.remove();
-						else
+						} else
 							return false;
 					}
 				}

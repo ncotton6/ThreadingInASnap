@@ -9,17 +9,11 @@ import main.annotations.Order;
 
 public class DBSim {
 
-	static List<String> queryResults = new ArrayList<String>();
 	static Random rand = new Random();
-	
-	
+
 	public static void main(String[] args) {
-		for(int i = 0; i < 50; ++i){
-			queryResults.add(String.valueOf(i));
-		}
-		
-		for(int i = 0; i < queryResults.size(); ++i){
-			getResult(queryResults.get(i));
+		for (int i = 0; i < 50; ++i) {
+			getResult(String.valueOf(i));
 		}
 
 	}
