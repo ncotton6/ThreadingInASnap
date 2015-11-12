@@ -38,7 +38,7 @@ public class ObjectPool {
 				System.err
 						.println("::::::::::::::::::\nAlready Contained\n:::::::::::::::::");
 			}
-			//System.out.println("Adding: " + id);
+			// System.out.println("Adding: " + id);
 			objectPool.put(id, (ShellObj) ret);
 		} else {
 			addError(id);
@@ -46,17 +46,17 @@ public class ObjectPool {
 	}
 
 	public ShellObj get(UUID uuid) {
+		// problem infinite loop if the object never gets added
+		ShellObj ret = null;
 		while (true) {
+			String id = uuid.toString();
 			if (errorPool.contains(uuid))
 				throw new RuntimeException("She's Not Coming :(");
-			if (objectPool.containsKey(uuid))
+			if ((ret = objectPool.get(uuid)) != null)
 				break;
 			Thread.yield();
 		}
-
-		ShellObj ret = objectPool.get(uuid);
 		objectPool.remove(uuid);
-		System.out.println("Removing: " + uuid);
 		if (ret == null) {
 			System.err.println("Cannot Find: " + uuid);
 		}

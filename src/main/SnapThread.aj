@@ -43,10 +43,11 @@ public aspect SnapThread {
 			}
 		}
 
-		if (tc.getThreadCount() >= Runtime.getRuntime().availableProcessors() * 3
-				|| ((!returnType.equals(Void.TYPE) && (!ShellObj.class
+		if (/*tc.getThreadCount() >= Runtime.getRuntime().availableProcessors() * 3
+				||*/ ((!returnType.equals(Void.TYPE) && (!ShellObj.class
 						.isAssignableFrom(returnType))))) {
 			// create a constraint on the number of actively running threads.
+			System.out.println("Run Seq");
 			return proceed();
 		} else if (returnType.equals(Void.TYPE)) {
 			ThreadingConstraints.get().incThreadCount();
@@ -94,8 +95,10 @@ public aspect SnapThread {
 							sp.acquire();
 							Object ret = proceed();
 							if (ret != null) {
+								System.out.println("Adding Obj: " + uuid);
 								ObjectPool.get().addObject(uuid, ret);
 							} else {
+								System.err.println("Adding Error: " + uuid);
 								ObjectPool.get().addError(uuid);
 							}
 						} catch (InterruptedException e) {
@@ -154,7 +157,9 @@ public aspect SnapThread {
 	}
 
 	// Using a Shell
-	pointcut shell(ShellObj shell) : execution(* ShellObj+.*(..)) && target(shell);
+	pointcut shell(ShellObj shell) : (execution(* ShellObj+.*(..)))
+			//|| set(ShellObj+.*) || get(ShellObj+.*)) 
+									&& target(shell);
 
 	before(ShellObj shell) : shell(shell) {
 		UUID id = shell.__shellObjectId;

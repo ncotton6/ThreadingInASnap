@@ -18,12 +18,6 @@ public class DBSim {
 		timeTaken();
 	}
 
-	@Order
-	private static void timeTaken() {
-		System.out.println("Time Taken: "
-				+ (System.currentTimeMillis() - start));
-	}
-
 	@Async
 	private static void getResult(String string) {
 		try {
@@ -39,4 +33,9 @@ public class DBSim {
 		System.out.println(string);
 	}
 
+	@Order
+	private static void timeTaken() {
+		System.out.println("Time Taken: "
+				+ (System.currentTimeMillis() - start));
+	}
 }
