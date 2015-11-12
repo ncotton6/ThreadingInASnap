@@ -4,7 +4,6 @@ import org.aspectj.lang.reflect.MethodSignature;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.concurrent.Semaphore;
-import java.util.UUID;
 import java.lang.reflect.*;
 
 import main.annotations.*;
@@ -16,7 +15,7 @@ public aspect SnapThread {
 	declare parents : (@Shell *) implements ShellObj;
 	declare parents : (@Shell *..*) implements ShellObj;
 
-	public UUID ShellObj.__shellObjectId = null;
+	public Future<ShellObj> ShellObj.__shellObject = null;
 
 	// async methods
 	pointcut async() : execution(@Async * *..*(..));
@@ -43,11 +42,12 @@ public aspect SnapThread {
 			}
 		}
 
-		if (/*tc.getThreadCount() >= Runtime.getRuntime().availableProcessors() * 3
-				||*/ ((!returnType.equals(Void.TYPE) && (!ShellObj.class
-						.isAssignableFrom(returnType))))) {
+		if (/*
+			 * tc.getThreadCount() >= Runtime.getRuntime().availableProcessors()
+			 * * 3 ||
+			 */((!returnType.equals(Void.TYPE) && (!ShellObj.class
+				.isAssignableFrom(returnType))))) {
 			// create a constraint on the number of actively running threads.
-			System.out.println("Run Seq");
 			return proceed();
 		} else if (returnType.equals(Void.TYPE)) {
 			ThreadingConstraints.get().incThreadCount();
@@ -70,12 +70,12 @@ public aspect SnapThread {
 			t.start();
 		} else {
 			// create shell object
-			final UUID uuid = UUID.randomUUID();
+			final Future<ShellObj> future = new Future<ShellObj>();
 			ShellObj ret = null;
 			if (!returnType.equals(Void.TYPE)) {
 				try {
 					ret = (ShellObj) returnType.getConstructor().newInstance();
-					ret.__shellObjectId = uuid;
+					ret.__shellObject = future;
 				} catch (NoSuchMethodException e) {
 					e.printStackTrace();
 				} catch (InvocationTargetException e) {
@@ -94,18 +94,13 @@ public aspect SnapThread {
 						try {
 							sp.acquire();
 							Object ret = proceed();
-							if (ret != null) {
-								System.out.println("Adding Obj: " + uuid);
-								ObjectPool.get().addObject(uuid, ret);
-							} else {
-								System.err.println("Adding Error: " + uuid);
-								ObjectPool.get().addError(uuid);
-							}
+							future.set((ShellObj) ret);
+							future.markDone();
 						} catch (InterruptedException e) {
 							e.printStackTrace();
 						}
 					} catch (Exception e) {
-						ObjectPool.get().addError(uuid);
+						future.markDone();
 					} finally {
 						ThreadingConstraints.get().decThreadCount();
 						sp.release();
@@ -162,12 +157,13 @@ public aspect SnapThread {
 									&& target(shell);
 
 	before(ShellObj shell) : shell(shell) {
-		UUID id = shell.__shellObjectId;
-		if (id == null)
-			return;
-		ShellObj actual = ObjectPool.get().get(id);
-		makeEqual(shell, actual);
-		shell.__shellObjectId = null;
+		if (shell.__shellObject != null) {
+			while (!shell.__shellObject.isReady())
+				Thread.yield();
+			ShellObj actual = shell.__shellObject.get();
+			makeEqual(shell, actual);
+			shell.__shellObject = null;
+		}
 	}
 
 	private static void makeEqual(ShellObj shell, ShellObj actual) {
