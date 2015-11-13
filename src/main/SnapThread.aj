@@ -107,13 +107,31 @@ public aspect SnapThread {
 				.getSignature());
 		Class<?> returnable = ((MethodSignature) thisJoinPointStaticPart
 				.getSignature()).getReturnType();
-		if (!returnable.isInterface()) {
-			if (!interfaceImplementation(returnable)) {
-
-			}
+		if (returnable.isInterface()) {
+			// proxy
+			final Future<Object> future = new Future<Object>();
+			Thread t = new Thread(new Runnable() {
+				@Override
+				public void run() {
+					try{
+						cs.acquire();
+						Object ret = proceed();
+						future.set(ret);
+						future.markDone();
+					}catch(InterruptedException e){}
+					finally{
+						cs.release();
+					}
+				}
+			});
+			ThreadTree.get().addThread(t);
+			t.start();
+			Object prox = Proxy.newProxyInstance(returnable.getClassLoader(), new Class<?>[]{returnable}, new ProxyHandler(future));
+			return prox;
+		}else{
+			// regular object, nothing we can do with it
+			return proceed();
 		}
-		// proxy
-		return null;
 	}
 
 	// sync methods
@@ -197,20 +215,5 @@ public aspect SnapThread {
 					threadCount <= 0 ? Integer.MAX_VALUE : threadCount);
 		}
 		return cs;
-	}
-
-	private static boolean interfaceImplementation(Class<?> clazz) {
-		Class<?>[] interfaces = clazz.getInterfaces();
-		Method[] methods = clazz.getMethods();
-		classMethods: for (Method m : methods) {
-			for (Class<?> inter : interfaces) {
-				Method[] interfaceMethods = inter.getDeclaredMethods();
-				for (Method i : interfaceMethods) {
-					if(m.equals(i))
-						continue classMethods;
-				}
-			}
-		}
-		return true;
 	}
 }
