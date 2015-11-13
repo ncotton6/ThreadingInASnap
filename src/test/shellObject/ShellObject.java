@@ -9,6 +9,7 @@ public class ShellObject {
 	private static int lastCount = 0;
 
 	public static void main(String[] args) throws InterruptedException {
+		startService();
 		long start = System.currentTimeMillis();
 		for (int i = 0; i < 1000; ++i) {
 			ProxyTest to = generateObject();
@@ -16,6 +17,8 @@ public class ShellObject {
 		}
 		outputEnd(start);
 	}
+
+	private static void startService() {}
 
 	@Order
 	private static void outputEnd(long start) {
