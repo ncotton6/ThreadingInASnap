@@ -15,8 +15,8 @@ import java.util.List;
 public class ThreadTree {
 
 	// Local Variables
-	private ThreadNode base;
 	private static ThreadTree tt = null;
+	private List<ThreadNode> baseLst;
 
 	/**
 	 * Private constructor to induce the singleton functionality.
@@ -25,7 +25,11 @@ public class ThreadTree {
 		if (tt != null)
 			throw new RuntimeException(
 					"ThreadTree is a singleton, cannot create more than one");
-		this.base = new ThreadNode(Thread.currentThread());
+		this.baseLst = new ArrayList<ThreadNode>() {
+			{
+				add(new ThreadNode(Thread.currentThread()));
+			}
+		};
 	}
 
 	/**
@@ -52,15 +56,30 @@ public class ThreadTree {
 	 * @param spawn
 	 */
 	public synchronized void addThread(Thread parent, Thread spawn) {
-		ThreadNode tn = find(parent, base);
+		ThreadNode tn = find(parent);
 		if (tn != null)
 			new ThreadNode(spawn, tn);
 	}
 	
-	public synchronized void addThread(Thread spawn){
+	public synchronized void addService(Thread service){
+		ThreadNode serviceNode = new ThreadNode(service);
+		baseLst.add(serviceNode);
+	}
+
+	public synchronized void addThread(Thread spawn) {
 		addThread(Thread.currentThread(), spawn);
 	}
 
+	
+	private ThreadNode find(Thread thread){
+		ThreadNode node = null;
+		for(ThreadNode tn : baseLst){
+			if((node = find(thread,tn)) != null)
+				return node;
+		}
+		return null;
+	}
+	
 	/**
 	 * Uses DFS to search the tree of threads to find the node that represents
 	 * the current thread.
@@ -89,7 +108,7 @@ public class ThreadTree {
 	 * @return
 	 */
 	public synchronized boolean threadReady(Thread thread) {
-		ThreadNode tn = find(thread, base);
+		ThreadNode tn = find(thread);
 		if (tn != null) {
 			// Check to make sure that all of the children of the node
 			// have completed
@@ -153,7 +172,6 @@ public class ThreadTree {
 	 */
 	private class ThreadNode {
 		// Local Variables
-		public long id;
 		public ThreadNode parent;
 		public WeakReference<Thread> thread;
 		public List<ThreadNode> spawn = new ArrayList<ThreadNode>();
@@ -178,7 +196,6 @@ public class ThreadTree {
 		public ThreadNode(Thread thread, ThreadNode parent) {
 			this.thread = new WeakReference<Thread>(thread);
 			this.parent = parent;
-			this.id = thread.getId();
 			parent.spawn.add(this);
 		}
 

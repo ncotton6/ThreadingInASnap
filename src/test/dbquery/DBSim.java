@@ -4,18 +4,28 @@ import java.util.Random;
 
 import main.annotations.Async;
 import main.annotations.Order;
+import main.annotations.Service;
 
 public class DBSim {
 
 	static Random rand = new Random();
 	static long start;
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws InterruptedException {
+		printingService();
 		start = System.currentTimeMillis();
 		for (int i = 0; i < 50; ++i) {
 			getResult(String.valueOf(i));
 		}
 		timeTaken();
+	}
+	
+	@Service(daemon = true)
+	private static void printingService() throws InterruptedException{
+		while(true){
+			System.out.println("hello World");
+			Thread.sleep(1000);
+		}
 	}
 
 	@Async

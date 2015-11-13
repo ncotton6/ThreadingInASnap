@@ -2,6 +2,7 @@ package test.shellObject;
 
 import main.annotations.Async;
 import main.annotations.Order;
+import main.annotations.Service;
 import main.constructs.Future;
 
 public class ShellObject {
@@ -18,7 +19,17 @@ public class ShellObject {
 		outputEnd(start);
 	}
 
-	private static void startService() {}
+	@Service
+	private static void startService() {
+		System.out.println("8");
+		while (true) {
+			System.out.println("Service Running");
+			try {
+				Thread.sleep(5000);
+			} catch (InterruptedException e) {
+			}
+		}
+	}
 
 	@Order
 	private static void outputEnd(long start) {
@@ -27,8 +38,8 @@ public class ShellObject {
 
 	@Async
 	private static void output(ProxyTest to) {
-		//to.get().toString();
-		System.out.println("\t"+to.output());
+		// to.get().toString();
+		System.out.println("\t" + to.output());
 	}
 
 	@Async

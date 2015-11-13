@@ -88,7 +88,7 @@ public aspect SnapThread {
 			public void run() {
 				try {
 					cs.acquire();
-					Future<?> ret = (Future<?>)proceed();
+					Future<?> ret = (Future<?>) proceed();
 					future.set(ret.get());
 					future.markDone();
 				} catch (InterruptedException e) {
@@ -154,6 +154,27 @@ public aspect SnapThread {
 
 	// sync fields
 
+	// service methods
+	declare error: execution(@Service !void *..*(..))
+	  : "A Service method may not return a value.";
+
+	pointcut service():execution(@Service void *..*(..));
+
+	Object around(): service(){
+		Service s = ((MethodSignature) thisJoinPointStaticPart.getSignature())
+				.getMethod().getAnnotation(Service.class);
+		Thread t = new Thread(new Runnable() {
+			@Override
+			public void run() {
+				proceed();
+			}
+		});
+		ThreadTree.get().addService(t);
+		t.setDaemon(s.daemon());
+		t.start();
+		return null;
+	}
+
 	// order methods
 	pointcut order() : execution(@Order * *..*(..));
 
@@ -195,11 +216,9 @@ public aspect SnapThread {
 			try {
 				f.set(shell, f.get(actual));
 			} catch (IllegalAccessException e) {
-				// e.printStackTrace();
-			} catch (Exception e) {
-				System.err.println("EHHHHHHHH!!!!");
 				e.printStackTrace();
-				throw new RuntimeException("Cannot Move Data Over");
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
 		}
 	}
@@ -217,4 +236,14 @@ public aspect SnapThread {
 		}
 		return cs;
 	}
+	
+	// declarable errors
+	declare error: 
+		(@annotation(Async) && @annotation(Order))
+		||(@annotation(Async) && @annotation(Service))
+		||(@annotation(Async) && @annotation(Sync))
+		||(@annotation(Order) && @annotation(Service))
+		||(@annotation(Order) && @annotation(Sync))
+		||(@annotation(Service) && @annotation(Sync))
+	:"Only one threading annotation per method.";
 }
