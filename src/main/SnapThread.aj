@@ -7,6 +7,16 @@ import java.lang.reflect.*;
 import main.annotations.*;
 import main.constructs.*;
 
+/**
+ * The SnapThread aspect will capture methods marked with Async, Order, Service,
+ * and Sync methods, to turn a single-threaded system into a multi-threaded one.
+ * 
+ * It will also prepare objects marked with Shell to semi-seamlessly interact
+ * with the system.
+ * 
+ * @author Nathaniel Cotton
+ * 
+ */
 public aspect SnapThread {
 
 	private static final String error_str = "Shouldn't have hit this point";

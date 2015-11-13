@@ -5,6 +5,10 @@ import java.util.HashMap;
 
 import main.constructs.ContextSemaphore;
 
+/**
+ * @author Nathaniel Cotton
+ *
+ */
 public class ThreadingConstraints {
 
 	private static ThreadingConstraints tc = null;
