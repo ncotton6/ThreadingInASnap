@@ -88,8 +88,8 @@ public aspect SnapThread {
 			public void run() {
 				try {
 					cs.acquire();
-					Object ret = proceed();
-					future.set(ret);
+					Future<?> ret = (Future<?>)proceed();
+					future.set(ret.get());
 					future.markDone();
 				} catch (InterruptedException e) {
 				} finally {
@@ -113,22 +113,23 @@ public aspect SnapThread {
 			Thread t = new Thread(new Runnable() {
 				@Override
 				public void run() {
-					try{
+					try {
 						cs.acquire();
 						Object ret = proceed();
 						future.set(ret);
 						future.markDone();
-					}catch(InterruptedException e){}
-					finally{
+					} catch (InterruptedException e) {
+					} finally {
 						cs.release();
 					}
 				}
 			});
 			ThreadTree.get().addThread(t);
 			t.start();
-			Object prox = Proxy.newProxyInstance(returnable.getClassLoader(), new Class<?>[]{returnable}, new ProxyHandler(future));
+			Object prox = Proxy.newProxyInstance(returnable.getClassLoader(),
+					new Class<?>[] { returnable }, new ProxyHandler(future));
 			return prox;
-		}else{
+		} else {
 			// regular object, nothing we can do with it
 			return proceed();
 		}
@@ -209,7 +210,7 @@ public aspect SnapThread {
 		if (cs == null) {
 			int threadCount = 1;
 			Async a = sig.getMethod().getAnnotation(Async.class);
-			if(a != null)
+			if (a != null)
 				threadCount = a.threads();
 			cs = ThreadingConstraints.get().createSemaphore(method,
 					threadCount <= 0 ? Integer.MAX_VALUE : threadCount);
