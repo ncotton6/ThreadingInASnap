@@ -12,19 +12,26 @@ public aspect SnapThread {
 	private static final String error_str = "Shouldn't have hit this point";
 
 	// inject shell objects
-	declare parents : (@Shell *) implements ShellObj;
-	declare parents : (@Shell *..*) implements ShellObj;
-	public Future<ShellObj> ShellObj.__shellObject = null;
+	declare parents : (@Shell *) implements ShellObject;
+	declare parents : (@Shell *..*) implements ShellObject;
+	public Future<ShellObject> ShellObject.__ShellObjectect = null;
 
 	// async methods
 	pointcut async_void() : execution(@Async void *..*(..));
 
-	pointcut async_shell() : execution(@Async ShellObj+ *..*(..));
+	pointcut async_shell() : execution(@Async ShellObject+ *..*(..));
 
 	pointcut async_future() : execution(@Async Future *..*(..));
 
-	pointcut async_other() : execution(@Async (!void && !ShellObj+ && !Future) *..*(..));
+	pointcut async_other() : execution(@Async (!void && !ShellObject+ && !Future) *..*(..));
 
+	/**
+	 * A method marked with Async, and has void as the return type is the
+	 * easiest case. The proceed is wrapped up in a thread and kicked off. No
+	 * return problem here :)
+	 * 
+	 * @return
+	 */
 	Object around(): async_void(){
 		final ContextSemaphore cs = getSemaphore((MethodSignature) thisJoinPointStaticPart
 				.getSignature());
@@ -45,27 +52,39 @@ public aspect SnapThread {
 		return null;
 	}
 
+	/**
+	 * Sometimes the return type of an async method is an implementor of the
+	 * ShellObject interface. Which indicates that the return type has had a
+	 * Future field introduced. This method will create an instance of the
+	 * return type class, as well as a future to be placed within the shell
+	 * object. This future will be filled once the thread finishes execution. At
+	 * this point once the object is used the values will be pulled out of the
+	 * future and pumped into the shell object returned, essentially making them
+	 * the same.
+	 * 
+	 * @return
+	 */
 	Object around(): async_shell(){
 		final ContextSemaphore cs = getSemaphore((MethodSignature) thisJoinPointStaticPart
 				.getSignature());
 		Class<?> returnable = ((MethodSignature) thisJoinPointStaticPart
 				.getSignature()).getMethod().getReturnType();
-		ShellObj shell = null;
+		ShellObject shell = null;
 		try {
-			shell = (ShellObj) returnable.getConstructor().newInstance();
+			shell = (ShellObject) returnable.getConstructor().newInstance();
 		} catch (InvocationTargetException e) {
 		} catch (IllegalAccessException e) {
 		} catch (InstantiationException e) {
 		} catch (NoSuchMethodException e) {
 		}
-		final Future<ShellObj> future = new Future<ShellObj>();
-		shell.__shellObject = future;
+		final Future<ShellObject> future = new Future<ShellObject>();
+		shell.__ShellObjectect = future;
 		Thread t = new Thread(new Runnable() {
 			@Override
 			public void run() {
 				try {
 					cs.acquire();
-					ShellObj obj = (ShellObj) proceed();
+					ShellObject obj = (ShellObject) proceed();
 					future.set(obj);
 					future.markDone();
 				} catch (InterruptedException e) {
@@ -79,6 +98,14 @@ public aspect SnapThread {
 		return shell;
 	}
 
+	/**
+	 * At this point the return type has already been determined to be a Future.
+	 * In order to proceed following code will return an empty future, and once
+	 * the thread execution of the method comes back with a value the Future
+	 * will be set, and marked.
+	 * 
+	 * @return An empty Future
+	 */
 	Object around(): async_future(){
 		final ContextSemaphore cs = getSemaphore((MethodSignature) thisJoinPointStaticPart
 				.getSignature());
@@ -102,6 +129,18 @@ public aspect SnapThread {
 		return future;
 	}
 
+	/**
+	 * This is the final option for an async method, where we don't know what
+	 * the return type is. If the return type pulled off of the MethodSignature
+	 * is an interface we will create a proxy for the returnable. Once the
+	 * thread has completed the proxy will be filled with the actual returned
+	 * object, and then invoke methods off of that when needed.
+	 * 
+	 * On the other hand if the return type is a solid object we have no choice
+	 * we must execute the method synchronously, and return the value given.
+	 * 
+	 * @return actual object, or proxy
+	 */
 	Object around(): async_other(){
 		final ContextSemaphore cs = getSemaphore((MethodSignature) thisJoinPointStaticPart
 				.getSignature());
@@ -138,6 +177,14 @@ public aspect SnapThread {
 	// sync methods
 	pointcut sync() : execution(@Sync * *..*(..));
 
+	/**
+	 * Any method or field that is marked with the Sync annotation is
+	 * essentially acts as synchronized block or method marker, in that it will
+	 * only let one thread in at a time. It uses the ContextSemaphore to
+	 * accomplish this.
+	 * 
+	 * @return
+	 */
 	Object around() : sync(){
 		ContextSemaphore sp = getSemaphore((MethodSignature) thisJoinPointStaticPart
 				.getSignature());
@@ -155,11 +202,23 @@ public aspect SnapThread {
 	// sync fields
 
 	// service methods
-	declare error: execution(@Service !void *..*(..))
-	  : "A Service method may not return a value.";
-
 	pointcut service():execution(@Service void *..*(..));
 
+	/**
+	 * A method marked with the Service annotation receives special treatment.
+	 * It will wrap the method into a thread and kick off execution, very
+	 * similar to the Async annotation. With the difference that a service
+	 * method will start of as a new base node within the ThreadTree data
+	 * structure. This makes a service method act very similar to a main method
+	 * when an application starts.
+	 * 
+	 * Their is a field held within the annotation that indicates whether or not
+	 * the service should be considered a daemon service, or user service. If
+	 * marked true, all threads created by the service will be marked as daemon.
+	 * Which will allow the JVM to exit once only daemon threads are running.
+	 * 
+	 * @return null
+	 */
 	Object around(): service(){
 		Service s = ((MethodSignature) thisJoinPointStaticPart.getSignature())
 				.getMethod().getAnnotation(Service.class);
@@ -178,6 +237,18 @@ public aspect SnapThread {
 	// order methods
 	pointcut order() : execution(@Order * *..*(..));
 
+	/**
+	 * Any method marked with the Order annotation will be surrounded with the
+	 * following code. With the following code which will force the current
+	 * executing thread to wait until all previously created threads have
+	 * finished, and all threads created by those threads have completed, and so
+	 * on and so forth. Once this thread has reached it's turn it will be
+	 * allowed to proceed. Well once it has gained access to the
+	 * ContextSemaphore, which is more of a formality given the prior
+	 * constraint.
+	 * 
+	 * @return
+	 */
 	Object around(): order(){
 		while (!ThreadTree.get().threadReady(Thread.currentThread())) {
 			Thread.yield();
@@ -195,20 +266,35 @@ public aspect SnapThread {
 	}
 
 	// Using a Shell
-	pointcut shell(ShellObj shell) : execution(* ShellObj+.*(..)) 
+	pointcut shell(ShellObject shell) : execution(* ShellObject+.*(..)) 
 									&& target(shell);
 
-	before(ShellObj shell) : shell(shell) {
-		if (shell.__shellObject != null) {
-			while (!shell.__shellObject.isReady())
+	/**
+	 * Before a ShellObject can be used it must have the values held in the
+	 * actual object moved into its fields.
+	 * 
+	 * @param shell
+	 */
+	before(ShellObject shell) : shell(shell) {
+		if (shell.__ShellObjectect != null) {
+			while (!shell.__ShellObjectect.isReady())
 				Thread.yield();
-			ShellObj actual = shell.__shellObject.get();
+			ShellObject actual = shell.__ShellObjectect.get();
 			makeEqual(shell, actual);
-			shell.__shellObject = null;
+			shell.__ShellObjectect = null;
 		}
 	}
 
-	private static void makeEqual(ShellObj shell, ShellObj actual) {
+	/**
+	 * This method takes two ShellObjects, one of which is the actual object,
+	 * and the other is the shell object that is being used for assignment. It
+	 * will then proceed to move over all field values from the actual object to
+	 * the shell object. Thus making the shell object the actual object.
+	 * 
+	 * @param shell
+	 * @param actual
+	 */
+	private static void makeEqual(ShellObject shell, ShellObject actual) {
 		Class<?> clazz = shell.getClass();
 		Field[] fields = clazz.getDeclaredFields();
 		for (Field f : fields) {
@@ -223,6 +309,16 @@ public aspect SnapThread {
 		}
 	}
 
+	/**
+	 * This method is given the method signature of the requesting method. With
+	 * this signature it will look up the corresponding ContextSemaphore for
+	 * constraining threads. If the ContextSemaphore doesn't exist this method
+	 * will create the ContextSemaphore and associate it with the method
+	 * signature.
+	 * 
+	 * @param sig
+	 * @return
+	 */
 	private static ContextSemaphore getSemaphore(MethodSignature sig) {
 		String method = sig.toLongString();
 		ContextSemaphore cs = ThreadingConstraints.get().getSemaphore(method);
@@ -236,7 +332,7 @@ public aspect SnapThread {
 		}
 		return cs;
 	}
-	
+
 	// declarable errors
 	declare error: 
 		(@annotation(Async) && @annotation(Order))
@@ -246,4 +342,13 @@ public aspect SnapThread {
 		||(@annotation(Order) && @annotation(Sync))
 		||(@annotation(Service) && @annotation(Sync))
 	:"Only one threading annotation per method.";
+
+	declare error: execution(@Service !void *..*(..))
+	: "A Service method may not return a value.";
+
+	/*
+	 * declare error: @annotation(Shell) && (execution(*.new(..)) &&
+	 * !execution(*.new())) :
+	 * "A Shell object must have a parameterless constructor.";
+	 */
 }

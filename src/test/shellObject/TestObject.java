@@ -10,6 +10,9 @@ public class TestObject implements ProxyTest{
 	public String name;
 	public float cash;
 	
+	public TestObject(){}
+	public TestObject(Object obj){}
+	
 	@Override
 	public String output() {
 		return "TestObject [id=" + id + ", name=" + name + ", cash=" + cash
