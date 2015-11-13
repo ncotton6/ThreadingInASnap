@@ -19,17 +19,6 @@ public class ShellObject {
 	@Order
 	private static void outputEnd(long start) {
 		System.out.println("Took: " + (System.currentTimeMillis() - start));
-		/*Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
-		for (Thread t : threadSet) {
-			if (t.isAlive()) {
-				System.err.println(t.getName() + "::" + t.isAlive());
-				if (t.getName().contains("Thread")){
-					System.out.println("Killing: " + t.getName());
-					//t.interrupt();
-					t.dumpStack();
-				}
-			}
-		}*/
 	}
 
 	@Async

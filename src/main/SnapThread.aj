@@ -42,10 +42,9 @@ public aspect SnapThread {
 			}
 		}
 
-		if (/*
-			 * tc.getThreadCount() >= Runtime.getRuntime().availableProcessors()
-			 * * 3 ||
-			 */((!returnType.equals(Void.TYPE) && (!ShellObj.class
+		if (tc.getThreadCount() >= Runtime.getRuntime().availableProcessors()
+			 * 8 ||
+			 ((!returnType.equals(Void.TYPE) && (!ShellObj.class
 				.isAssignableFrom(returnType))))) {
 			// create a constraint on the number of actively running threads.
 			return proceed();
