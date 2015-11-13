@@ -23,8 +23,8 @@ public class ShellObject {
 
 	@Async
 	private static void output(TestObject to) {
-		//to.toString();
-		System.out.println("\t"+to.toString());
+		to.toString();
+		//System.out.println("\t"+to.toString());
 	}
 
 	@Async

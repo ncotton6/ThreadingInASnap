@@ -56,6 +56,10 @@ public class ThreadTree {
 		if (tn != null)
 			new ThreadNode(spawn, tn);
 	}
+	
+	public synchronized void addThread(Thread spawn){
+		addThread(Thread.currentThread(), spawn);
+	}
 
 	/**
 	 * Uses DFS to search the tree of threads to find the node that represents

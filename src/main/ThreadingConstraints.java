@@ -8,35 +8,50 @@ import main.constructs.ContextSemaphore;
 public class ThreadingConstraints {
 
 	private static ThreadingConstraints tc = null;
-	Map<String,ContextSemaphore> lockMap = new HashMap<String,ContextSemaphore>();
+	private Map<String, ContextSemaphore> lockMap = new HashMap<String, ContextSemaphore>();
 	private Integer numberOfRunningThreads = 0;
-	
-	private ThreadingConstraints(){}
-	
-	public static ThreadingConstraints get(){
-		if(tc == null)
+
+	private ThreadingConstraints() {
+	}
+
+	public static ThreadingConstraints get() {
+		if (tc == null)
 			synchronized (ThreadingConstraints.class) {
-				if(tc == null){
+				if (tc == null) {
 					tc = new ThreadingConstraints();
 				}
 			}
 		return tc;
 	}
-	
-	public void incThreadCount(){
+
+	public ContextSemaphore getSemaphore(String method) {
+		return lockMap.get(method);
+	}
+
+	public synchronized ContextSemaphore createSemaphore(String method,
+			int threadCount) {
+		ContextSemaphore cs = null;
+		if ((cs = lockMap.get(method)) == null) {
+			cs = new ContextSemaphore(threadCount, true);
+			lockMap.put(method, cs);
+		}
+		return cs;
+	}
+
+	public void incThreadCount() {
 		synchronized (numberOfRunningThreads) {
 			numberOfRunningThreads += 1;
 		}
 	}
-	
-	public void decThreadCount(){
+
+	public void decThreadCount() {
 		synchronized (numberOfRunningThreads) {
 			numberOfRunningThreads -= 1;
 		}
 	}
-	
-	public int getThreadCount(){
+
+	public int getThreadCount() {
 		return numberOfRunningThreads;
 	}
-	
+
 }
