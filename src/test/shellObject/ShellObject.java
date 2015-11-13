@@ -11,7 +11,7 @@ public class ShellObject {
 	public static void main(String[] args) throws InterruptedException {
 		long start = System.currentTimeMillis();
 		for (int i = 0; i < 1000; ++i) {
-			Future<TestObject> to = generateObject();
+			ProxyTest to = generateObject();
 			output(to);
 		}
 		outputEnd(start);
@@ -23,22 +23,18 @@ public class ShellObject {
 	}
 
 	@Async
-	private static void output(Future<TestObject> to) {
-		while(!to.isReady())
-			Thread.yield();
+	private static void output(ProxyTest to) {
 		//to.get().toString();
-		System.out.println("\t"+to.get().toString());
+		System.out.println("\t"+to.output());
 	}
 
 	@Async
-	private static Future<TestObject> generateObject() throws InterruptedException {
+	private static ProxyTest generateObject() throws InterruptedException {
 		Thread.sleep(200);
 		TestObject to = new TestObject();
 		to.cash = lastCount += 2;
 		to.name = "Jar Jar Binks"; // idk doesn't matter
-		Future f = new Future<TestObject>();
-		f.set(to);
-		return f;
+		return to;
 	}
 
 }

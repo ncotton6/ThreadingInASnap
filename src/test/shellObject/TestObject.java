@@ -3,7 +3,7 @@ package test.shellObject;
 import main.annotations.Shell;
 
 @Shell
-public class TestObject {
+public class TestObject implements ProxyTest{
 
 	public static int instanceCount = 0;
 	public int id = instanceCount++;
@@ -11,7 +11,7 @@ public class TestObject {
 	public float cash;
 	
 	@Override
-	public String toString() {
+	public String output() {
 		return "TestObject [id=" + id + ", name=" + name + ", cash=" + cash
 				+ "]";
 	}
