@@ -12,7 +12,7 @@ public class DBSim {
 	static long start;
 
 	public static void main(String[] args) throws InterruptedException {
-		printingService();
+		//printingService();
 		start = System.currentTimeMillis();
 		for (int i = 0; i < 50; ++i) {
 			getResult(String.valueOf(i));

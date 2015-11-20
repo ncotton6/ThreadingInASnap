@@ -8,6 +8,7 @@ public class DBSim2 {
 
 	static Random rand = new Random();
 	static long start;
+	static Thread prev = null;
 	static List<Thread> lst = new ArrayList<Thread>();
 
 	public static void main(String[] args) {
@@ -15,11 +16,8 @@ public class DBSim2 {
 		for (int i = 0; i < 50; ++i) {
 			getResult(String.valueOf(i));
 		}
-		for (Thread t : lst) {
-			t.start();
-		}
 		try {
-			lst.get(lst.size()-1).join();
+			prev.join();
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -29,7 +27,7 @@ public class DBSim2 {
 
 	private static void getResult(String string) {
 		final String temp = string;
-		final Thread thread = lst.size() == 0 ? null : lst.get(lst.size() - 1);
+		final Thread thread = prev;
 		Thread t = new Thread(new Runnable() {
 			@Override
 			public void run() {
@@ -43,6 +41,7 @@ public class DBSim2 {
 				}
 			}
 		});
-		lst.add(t);
+		prev = t;
+		t.start();
 	}
 }
