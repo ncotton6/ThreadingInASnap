@@ -197,6 +197,9 @@ public aspect SnapThread {
 	 * only let one thread in at a time. It uses the ContextSemaphore to
 	 * accomplish this.
 	 * 
+	 * Special note at the moment there is not a way to differentiate instances,
+	 * therefore instance based semaphores are not available.
+	 * 
 	 * @return
 	 */
 	Object around() : sync_method(){
@@ -213,6 +216,17 @@ public aspect SnapThread {
 		throw new RuntimeException(error_str);
 	}
 
+	/**
+	 * A field within a class that is annotated with the @Sync annotation will
+	 * be wrapped with the following advice. Which will retrieve the joinpoint
+	 * signature and lookup/create a context semaphore that the thread must
+	 * aquire access to before proceeding.
+	 * 
+	 * Special note at the moment there is not a way to differentiate instances,
+	 * therefore instance based semaphores are not available.
+	 * 
+	 * @return
+	 */
 	Object around() : sync_field(){
 		ContextSemaphore sp = getSemaphore(thisJoinPointStaticPart
 				.getSignature());
@@ -260,7 +274,9 @@ public aspect SnapThread {
 	}
 
 	// order methods
-	pointcut order() : execution(@Order * *..*(..));
+	pointcut order() : execution(@Order * *..*(..)) 
+		|| get(@Order *..* *..*.*) || set(@Order *..* *..*.*)
+		|| get(@Order * *..*.*) || set(@Order * *..*.*);
 
 	/**
 	 * Any method marked with the Order annotation will be surrounded with the
@@ -278,7 +294,7 @@ public aspect SnapThread {
 		while (!ThreadTree.get().threadReady(Thread.currentThread())) {
 			Thread.yield();
 		}
-		ContextSemaphore cs = getSemaphore((MethodSignature) thisJoinPointStaticPart
+		ContextSemaphore cs = getSemaphore(thisJoinPointStaticPart
 				.getSignature());
 		try {
 			cs.acquire();
@@ -369,7 +385,7 @@ public aspect SnapThread {
 		||(@annotation(Order) && @annotation(Service))
 		||(@annotation(Order) && @annotation(Sync))
 		||(@annotation(Service) && @annotation(Sync))
-	:"Only one threading annotation per method.";
+	:"Only one threading annotation per component.";
 
 	declare error: execution(@Service !void *..*(..))
 	: "A Service method may not return a value.";

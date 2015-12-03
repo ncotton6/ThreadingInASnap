@@ -9,8 +9,9 @@ import main.annotations.Sync;
 
 public class DBSim {
 
+	//@Order
 	static Random rand = new Random();
-	@Sync
+	@Order
 	static long start;
 
 	public static void main(String[] args) throws InterruptedException {
