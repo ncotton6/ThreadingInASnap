@@ -1,5 +1,6 @@
 package main;
 
+import org.aspectj.lang.Signature;
 import org.aspectj.lang.reflect.MethodSignature;
 
 import java.lang.reflect.*;
@@ -24,7 +25,7 @@ public aspect SnapThread {
 	// inject shell objects
 	declare parents : (@Shell *) implements ShellObject;
 	declare parents : (@Shell *..*) implements ShellObject;
-	public Future<ShellObject> ShellObject.__ShellObjectect = null;
+	public Future<ShellObject> ShellObject.__ShellObject = null;
 
 	// async methods
 	pointcut async_void() : execution(@Async void *..*(..));
@@ -43,7 +44,7 @@ public aspect SnapThread {
 	 * @return
 	 */
 	Object around(): async_void(){
-		final ContextSemaphore cs = getSemaphore((MethodSignature) thisJoinPointStaticPart
+		final ContextSemaphore cs = getSemaphore(thisJoinPointStaticPart
 				.getSignature());
 		Thread t = new Thread(new Runnable() {
 			@Override
@@ -75,7 +76,7 @@ public aspect SnapThread {
 	 * @return
 	 */
 	Object around(): async_shell(){
-		final ContextSemaphore cs = getSemaphore((MethodSignature) thisJoinPointStaticPart
+		final ContextSemaphore cs = getSemaphore(thisJoinPointStaticPart
 				.getSignature());
 		Class<?> returnable = ((MethodSignature) thisJoinPointStaticPart
 				.getSignature()).getMethod().getReturnType();
@@ -88,7 +89,7 @@ public aspect SnapThread {
 		} catch (NoSuchMethodException e) {
 		}
 		final Future<ShellObject> future = new Future<ShellObject>();
-		shell.__ShellObjectect = future;
+		shell.__ShellObject = future;
 		Thread t = new Thread(new Runnable() {
 			@Override
 			public void run() {
@@ -117,7 +118,7 @@ public aspect SnapThread {
 	 * @return An empty Future
 	 */
 	Object around(): async_future(){
-		final ContextSemaphore cs = getSemaphore((MethodSignature) thisJoinPointStaticPart
+		final ContextSemaphore cs = getSemaphore(thisJoinPointStaticPart
 				.getSignature());
 		final Future<Object> future = new Future<Object>();
 		Thread t = new Thread(new Runnable() {
@@ -152,7 +153,7 @@ public aspect SnapThread {
 	 * @return actual object, or proxy
 	 */
 	Object around(): async_other(){
-		final ContextSemaphore cs = getSemaphore((MethodSignature) thisJoinPointStaticPart
+		final ContextSemaphore cs = getSemaphore(thisJoinPointStaticPart
 				.getSignature());
 		Class<?> returnable = ((MethodSignature) thisJoinPointStaticPart
 				.getSignature()).getReturnType();
@@ -185,7 +186,10 @@ public aspect SnapThread {
 	}
 
 	// sync methods
-	pointcut sync() : execution(@Sync * *..*(..));
+	pointcut sync_method() : execution(@Sync * *..*(..));
+
+	pointcut sync_field() : get(@Sync *..* *..*.*) || set(@Sync *..* *..*.*)
+		|| get(@Sync *..* *..*.*) || set(@Sync *..* *..*.*);
 
 	/**
 	 * Any method or field that is marked with the Sync annotation is
@@ -195,8 +199,8 @@ public aspect SnapThread {
 	 * 
 	 * @return
 	 */
-	Object around() : sync(){
-		ContextSemaphore sp = getSemaphore((MethodSignature) thisJoinPointStaticPart
+	Object around() : sync_method(){
+		ContextSemaphore sp = getSemaphore(thisJoinPointStaticPart
 				.getSignature());
 		try {
 			sp.acquire();
@@ -209,7 +213,18 @@ public aspect SnapThread {
 		throw new RuntimeException(error_str);
 	}
 
-	// sync fields
+	Object around() : sync_field(){
+		ContextSemaphore sp = getSemaphore(thisJoinPointStaticPart
+				.getSignature());
+		try {
+			return proceed();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		} finally {
+			sp.release();
+		}
+		throw new RuntimeException(error_str);
+	}
 
 	// service methods
 	pointcut service():execution(@Service void *..*(..));
@@ -286,12 +301,12 @@ public aspect SnapThread {
 	 * @param shell
 	 */
 	before(ShellObject shell) : shell(shell) {
-		if (shell.__ShellObjectect != null) {
-			while (!shell.__ShellObjectect.isReady())
+		if (shell.__ShellObject != null) {
+			while (!shell.__ShellObject.isReady())
 				Thread.yield();
-			ShellObject actual = shell.__ShellObjectect.get();
+			ShellObject actual = shell.__ShellObject.get();
 			makeEqual(shell, actual);
-			shell.__ShellObjectect = null;
+			shell.__ShellObject = null;
 		}
 	}
 
@@ -329,15 +344,18 @@ public aspect SnapThread {
 	 * @param sig
 	 * @return
 	 */
-	private static ContextSemaphore getSemaphore(MethodSignature sig) {
-		String method = sig.toLongString();
-		ContextSemaphore cs = ThreadingConstraints.get().getSemaphore(method);
+	private static ContextSemaphore getSemaphore(Signature sig) {
+		String key = sig.toLongString();
+		ContextSemaphore cs = ThreadingConstraints.get().getSemaphore(key);
 		if (cs == null) {
 			int threadCount = 1;
-			Async a = sig.getMethod().getAnnotation(Async.class);
-			if (a != null)
-				threadCount = a.threads();
-			cs = ThreadingConstraints.get().createSemaphore(method,
+			if (sig instanceof MethodSignature) {
+				Async a = ((MethodSignature) sig).getMethod().getAnnotation(
+						Async.class);
+				if (a != null)
+					threadCount = a.threads();
+			}
+			cs = ThreadingConstraints.get().createSemaphore(key,
 					threadCount <= 0 ? Integer.MAX_VALUE : threadCount);
 		}
 		return cs;

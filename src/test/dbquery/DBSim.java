@@ -5,10 +5,12 @@ import java.util.Random;
 import main.annotations.Async;
 import main.annotations.Order;
 import main.annotations.Service;
+import main.annotations.Sync;
 
 public class DBSim {
 
 	static Random rand = new Random();
+	@Sync
 	static long start;
 
 	public static void main(String[] args) throws InterruptedException {

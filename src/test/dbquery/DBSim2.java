@@ -9,7 +9,6 @@ public class DBSim2 {
 	static Random rand = new Random();
 	static long start;
 	static Thread prev = null;
-	static List<Thread> lst = new ArrayList<Thread>();
 
 	public static void main(String[] args) {
 		start = System.currentTimeMillis();
