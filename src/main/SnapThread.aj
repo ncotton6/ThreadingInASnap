@@ -59,6 +59,7 @@ public aspect SnapThread {
 			}
 		});
 		ThreadTree.get().addThread(t);
+		t.setDaemon(Thread.currentThread().isDaemon());
 		t.start();
 		return null;
 	}
@@ -105,6 +106,7 @@ public aspect SnapThread {
 			}
 		});
 		ThreadTree.get().addThread(t);
+		t.setDaemon(Thread.currentThread().isDaemon());
 		t.start();
 		return shell;
 	}
@@ -136,6 +138,7 @@ public aspect SnapThread {
 			}
 		});
 		ThreadTree.get().addThread(t);
+		t.setDaemon(Thread.currentThread().isDaemon());
 		t.start();
 		return future;
 	}
@@ -175,6 +178,7 @@ public aspect SnapThread {
 				}
 			});
 			ThreadTree.get().addThread(t);
+			t.setDaemon(Thread.currentThread().isDaemon());
 			t.start();
 			Object prox = Proxy.newProxyInstance(returnable.getClassLoader(),
 					new Class<?>[] { returnable }, new ProxyHandler(future));
@@ -279,8 +283,8 @@ public aspect SnapThread {
 		|| get(@Order * *..*.*) || set(@Order * *..*.*);
 
 	/**
-	 * Any method marked with the Order annotation will be surrounded with the
-	 * following code. With the following code which will force the current
+	 * Any method or field marked with the Order annotation will be surrounded with the
+	 * following code. Which will force the current
 	 * executing thread to wait until all previously created threads have
 	 * finished, and all threads created by those threads have completed, and so
 	 * on and so forth. Once this thread has reached it's turn it will be
