@@ -1,13 +1,21 @@
 package main.constructs;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.Semaphore;
 
+/**
+ * ContextSemaphore extends the functionality of a Semaphore, by allowing
+ * threads that already have access to continue execution. Therefore multiple
+ * calls to acquire by one thread will allow the thread to continue execution.
+ * 
+ * @author Nathaniel Cotton
+ * 
+ */
 public class ContextSemaphore extends Semaphore {
 
 	private static final long serialVersionUID = 1L;
-	private Set<Thread> currents = new HashSet<Thread>();
+	private Map<Thread,Integer> currents = new HashMap<Thread,Integer>();
 
 	public ContextSemaphore(int permits) {
 		super(permits);
@@ -20,17 +28,24 @@ public class ContextSemaphore extends Semaphore {
 	@Override
 	public void acquire() throws InterruptedException {
 		Thread current = Thread.currentThread();
-		if (!currents.contains(current)) {
+		if (!currents.containsKey(current)) {
 			super.acquire();
-			currents.add(current);
+			currents.put(current,1);
+		}else{
+			currents.put(current, currents.get(current)+1);
 		}
 	}
 
 	@Override
 	public void release() {
-		if (currents.contains(Thread.currentThread())) {
-			super.release();
-			currents.remove(Thread.currentThread());
+		Thread thread = Thread.currentThread();
+		if (currents.containsKey(thread)) {
+			int count = currents.get(thread);
+			currents.put(thread, count-1);
+			if(count == 1){
+				currents.remove(thread);
+				super.release();
+			}				
 		}
 	}
 
