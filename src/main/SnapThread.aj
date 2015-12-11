@@ -3,6 +3,7 @@ package main;
 import org.aspectj.lang.Signature;
 import org.aspectj.lang.reflect.MethodSignature;
 
+
 import java.lang.reflect.*;
 
 import main.annotations.*;
@@ -21,6 +22,8 @@ import main.constructs.*;
 public aspect SnapThread {
 
 	private static final String error_str = "Shouldn't have hit this point";
+	private static final int maxThreads = Runtime.getRuntime()
+			.availableProcessors() * 6;
 
 	// inject shell objects
 	declare parents : (@Shell *) implements ShellObject;
@@ -46,21 +49,34 @@ public aspect SnapThread {
 	Object around(): async_void(){
 		final ContextSemaphore cs = getSemaphore(thisJoinPointStaticPart
 				.getSignature());
-		Thread t = new Thread(new Runnable() {
-			@Override
-			public void run() {
-				try {
-					cs.acquire();
-					proceed();
-				} catch (InterruptedException e) {
-				} finally {
-					cs.release();
+		if (ThreadingConstraints.get().getThreadCount() <= maxThreads) {
+			ThreadingConstraints.get().incThreadCount();
+			Thread t = new Thread(new Runnable() {
+				@Override
+				public void run() {
+					try {
+						cs.acquire();
+						proceed();
+					} catch (InterruptedException e) {
+					} finally {
+						cs.release();
+						ThreadingConstraints.get().decThreadCount();
+					}
 				}
+			});
+			ThreadTree.get().addThread(t);
+			t.setDaemon(Thread.currentThread().isDaemon());
+			t.start();
+		} else {
+			try {
+				cs.acquire();
+				proceed();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			} finally {
+				cs.release();
 			}
-		});
-		ThreadTree.get().addThread(t);
-		t.setDaemon(Thread.currentThread().isDaemon());
-		t.start();
+		}
 		return null;
 	}
 
@@ -79,36 +95,50 @@ public aspect SnapThread {
 	Object around(): async_shell(){
 		final ContextSemaphore cs = getSemaphore(thisJoinPointStaticPart
 				.getSignature());
-		Class<?> returnable = ((MethodSignature) thisJoinPointStaticPart
-				.getSignature()).getMethod().getReturnType();
-		ShellObject shell = null;
-		try {
-			shell = (ShellObject) returnable.getConstructor().newInstance();
-		} catch (InvocationTargetException e) {
-		} catch (IllegalAccessException e) {
-		} catch (InstantiationException e) {
-		} catch (NoSuchMethodException e) {
-		}
-		final Future<ShellObject> future = new Future<ShellObject>();
-		shell.__ShellObject = future;
-		Thread t = new Thread(new Runnable() {
-			@Override
-			public void run() {
-				try {
-					cs.acquire();
-					ShellObject obj = (ShellObject) proceed();
-					future.set(obj);
-					future.markDone();
-				} catch (InterruptedException e) {
-				} finally {
-					cs.release();
-				}
+		if (ThreadingConstraints.get().getThreadCount() <= maxThreads) {
+			ThreadingConstraints.get().incThreadCount();
+			Class<?> returnable = ((MethodSignature) thisJoinPointStaticPart
+					.getSignature()).getMethod().getReturnType();
+			ShellObject shell = null;
+			try {
+				shell = (ShellObject) returnable.getConstructor().newInstance();
+			} catch (InvocationTargetException e) {
+			} catch (IllegalAccessException e) {
+			} catch (InstantiationException e) {
+			} catch (NoSuchMethodException e) {
 			}
-		});
-		ThreadTree.get().addThread(t);
-		t.setDaemon(Thread.currentThread().isDaemon());
-		t.start();
-		return shell;
+			final Future<ShellObject> future = new Future<ShellObject>();
+			shell.__ShellObject = future;
+			Thread t = new Thread(new Runnable() {
+				@Override
+				public void run() {
+					try {
+						cs.acquire();
+						ShellObject obj = (ShellObject) proceed();
+						future.set(obj);
+						future.markDone();
+					} catch (InterruptedException e) {
+					} finally {
+						cs.release();
+						ThreadingConstraints.get().decThreadCount();
+					}
+				}
+			});
+			ThreadTree.get().addThread(t);
+			t.setDaemon(Thread.currentThread().isDaemon());
+			t.start();
+			return shell;
+		} else {
+			try {
+				cs.acquire();
+				return proceed();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			} finally {
+				cs.release();
+			}
+		}
+		throw new RuntimeException(error_str);
 	}
 
 	/**
@@ -122,25 +152,39 @@ public aspect SnapThread {
 	Object around(): async_future(){
 		final ContextSemaphore cs = getSemaphore(thisJoinPointStaticPart
 				.getSignature());
-		final Future<Object> future = new Future<Object>();
-		Thread t = new Thread(new Runnable() {
-			@Override
-			public void run() {
-				try {
-					cs.acquire();
-					Future<?> ret = (Future<?>) proceed();
-					future.set(ret.get());
-					future.markDone();
-				} catch (InterruptedException e) {
-				} finally {
-					cs.release();
+		if (ThreadingConstraints.get().getThreadCount() <= maxThreads) {
+			ThreadingConstraints.get().incThreadCount();
+			final Future<Object> future = new Future<Object>();
+			Thread t = new Thread(new Runnable() {
+				@Override
+				public void run() {
+					try {
+						cs.acquire();
+						Future<?> ret = (Future<?>) proceed();
+						future.set(ret.get());
+						future.markDone();
+					} catch (InterruptedException e) {
+					} finally {
+						cs.release();
+						ThreadingConstraints.get().decThreadCount();
+					}
 				}
+			});
+			ThreadTree.get().addThread(t);
+			t.setDaemon(Thread.currentThread().isDaemon());
+			t.start();
+			return future;
+		} else {
+			try {
+				cs.acquire();
+				return proceed();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			} finally {
+				cs.release();
 			}
-		});
-		ThreadTree.get().addThread(t);
-		t.setDaemon(Thread.currentThread().isDaemon());
-		t.start();
-		return future;
+		}
+		throw new RuntimeException(error_str);
 	}
 
 	/**
@@ -158,35 +202,52 @@ public aspect SnapThread {
 	Object around(): async_other(){
 		final ContextSemaphore cs = getSemaphore(thisJoinPointStaticPart
 				.getSignature());
+
 		Class<?> returnable = ((MethodSignature) thisJoinPointStaticPart
 				.getSignature()).getReturnType();
 		if (returnable.isInterface()) {
 			// proxy
-			final Future<Object> future = new Future<Object>();
-			Thread t = new Thread(new Runnable() {
-				@Override
-				public void run() {
-					try {
-						cs.acquire();
-						Object ret = proceed();
-						future.set(ret);
-						future.markDone();
-					} catch (InterruptedException e) {
-					} finally {
-						cs.release();
+			if (ThreadingConstraints.get().getThreadCount() <= maxThreads) {
+				ThreadingConstraints.get().incThreadCount();
+				final Future<Object> future = new Future<Object>();
+				Thread t = new Thread(new Runnable() {
+					@Override
+					public void run() {
+						try {
+							cs.acquire();
+							Object ret = proceed();
+							future.set(ret);
+							future.markDone();
+						} catch (InterruptedException e) {
+						} finally {
+							cs.release();
+							ThreadingConstraints.get().decThreadCount();
+						}
 					}
+				});
+				ThreadTree.get().addThread(t);
+				t.setDaemon(Thread.currentThread().isDaemon());
+				t.start();
+				Object prox = Proxy
+						.newProxyInstance(returnable.getClassLoader(),
+								new Class<?>[] { returnable },
+								new ProxyHandler(future));
+				return prox;
+			} else {
+				try {
+					cs.acquire();
+					return proceed();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				} finally {
+					cs.release();
 				}
-			});
-			ThreadTree.get().addThread(t);
-			t.setDaemon(Thread.currentThread().isDaemon());
-			t.start();
-			Object prox = Proxy.newProxyInstance(returnable.getClassLoader(),
-					new Class<?>[] { returnable }, new ProxyHandler(future));
-			return prox;
+			}
 		} else {
 			// regular object, nothing we can do with it
 			return proceed();
 		}
+		throw new RuntimeException(error_str);
 	}
 
 	// sync methods
@@ -283,14 +344,13 @@ public aspect SnapThread {
 		|| get(@Order * *..*.*) || set(@Order * *..*.*);
 
 	/**
-	 * Any method or field marked with the Order annotation will be surrounded with the
-	 * following code. Which will force the current
-	 * executing thread to wait until all previously created threads have
-	 * finished, and all threads created by those threads have completed, and so
-	 * on and so forth. Once this thread has reached it's turn it will be
-	 * allowed to proceed. Well once it has gained access to the
-	 * ContextSemaphore, which is more of a formality given the prior
-	 * constraint.
+	 * Any method or field marked with the Order annotation will be surrounded
+	 * with the following code. Which will force the current executing thread to
+	 * wait until all previously created threads have finished, and all threads
+	 * created by those threads have completed, and so on and so forth. Once
+	 * this thread has reached it's turn it will be allowed to proceed. Well
+	 * once it has gained access to the ContextSemaphore, which is more of a
+	 * formality given the prior constraint.
 	 * 
 	 * @return
 	 */
